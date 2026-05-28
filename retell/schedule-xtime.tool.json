@@ -1,0 +1,38 @@
+{
+  "type": "custom",
+  "name": "schedule_xtime_appointment",
+  "description": "Books a service appointment at the dealership through the Xtime middleware. Use this once you have collected the customer's contact info, vehicle, requested service, and a desired appointment time.",
+  "speak_during_execution": true,
+  "speak_after_execution": true,
+  "execution_message_description": "Give me one moment while I get that appointment booked for you.",
+  "url": "https://autoace-pink.vercel.app/api/schedule-xtime",
+  "method": "POST",
+  "timeout_ms": 25000,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "parameters": {
+    "type": "object",
+    "required": ["service_requested", "appointment_time"],
+    "properties": {
+      "customer_phone":      { "type": "string", "description": "Caller's phone number in E.164 form, e.g. +19785551234." },
+      "customer_email":      { "type": "string", "description": "Caller's email address if they provided one." },
+      "customer_first_name": { "type": "string", "description": "First name." },
+      "customer_last_name":  { "type": "string", "description": "Last name." },
+      "vehicle_year":        { "type": "integer", "description": "Vehicle model year, e.g. 2022." },
+      "vehicle_make":        { "type": "string", "description": "Vehicle make, e.g. Subaru." },
+      "vehicle_model":       { "type": "string", "description": "Vehicle model, e.g. Outback." },
+      "vehicle_vin":         { "type": "string", "description": "17-char VIN if the caller knows it." },
+      "vehicle_mileage":     { "type": "integer", "description": "Approximate odometer reading." },
+      "service_requested":   { "type": "string", "description": "What the customer wants done, in their own words. E.g. 'oil change', 'tire rotation', '60k service'." },
+      "appointment_time":    { "type": "string", "description": "Requested appointment time as ISO-8601 (preferred) or 'YYYY-MM-DD HH:mm'." },
+      "transportation":      { "type": "string", "enum": ["CUSTWAIT", "DROPOFF", "LOANER", "SHUTTLE"], "description": "How the customer wants to handle transportation." },
+      "dealer_slug":         { "type": "string", "description": "Optional dealer override; defaults to the dealer associated with the inbound number." }
+    }
+  },
+  "response_variables": [
+    { "name": "success",  "path": "success" },
+    { "name": "message",  "path": "message" },
+    { "name": "confirmation_number", "path": "appointment.confirmation_number" }
+  ]
+}

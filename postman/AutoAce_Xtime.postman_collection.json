@@ -1,0 +1,199 @@
+{
+  "info": {
+    "name": "AutoAce — Xtime Reverse-Engineered API",
+    "description": "Reverse-engineered Xtime REST endpoints + the AutoAce middleware. Auth values (`tokenId`, `XID` cookie) are scraped from a logged-in DevTools session at mcgovernsubaruofacton.com. Set them once on the collection variables and every request inherits them.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "8b0e7f2c-3c7e-4a47-9c2a-autoacextime001"
+  },
+  "variable": [
+    { "key": "xtime_base_url",      "value": "https://x10con.xtime.com" },
+    { "key": "xtime_consumer_origin","value": "https://consumer.xtime.com" },
+    { "key": "xtime_token_id",      "value": "7778139113",                 "description": "Short numeric session token; refresh by reloading consumer.xtime.com." },
+    { "key": "xtime_country_code",  "value": "US" },
+    { "key": "xtime_recaptcha",     "value": "PASTE_FRESH_TOKEN_FROM_DEVTOOLS", "description": "Google reCAPTCHA v3 token, ~2-min TTL. Capture from a live request." },
+    { "key": "xtime_xid_cookie",    "value": "",                          "description": "Set automatically after Step A's response (test script)." },
+    { "key": "dealer_id",           "value": "xtm20220211107xx1",          "description": "Alphanumeric Xtime dealer id from the URL path." },
+    { "key": "customer_email",   "value": "test.customer@example.com" },
+    { "key": "customer_phone",   "value": "+19785551234" },
+    { "key": "customer_id",      "value": "" },
+    { "key": "vehicle_id",       "value": "" },
+    { "key": "service_code",     "value": "LOF" },
+    { "key": "appointment_iso",  "value": "2026-05-29T14:00:00-04:00" },
+    { "key": "middleware_base",  "value": "http://localhost:3000" }
+  ],
+  "auth": { "type": "noauth" },
+  "item": [
+    {
+      "name": "Xtime",
+      "item": [
+        {
+          "name": "A. Lookup customer + vehicles by email",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Origin", "value": "{{xtime_consumer_origin}}" },
+              { "key": "Referer", "value": "{{xtime_consumer_origin}}/" }
+            ],
+            "url": {
+              "raw": "{{xtime_base_url}}/xws/rest/vehicles/dealer/{{dealer_id}}/customerVehicles?tokenId={{xtime_token_id}}&dlrCountryCode={{xtime_country_code}}&gRecaptchaResponse={{xtime_recaptcha}}&email={{customer_email}}",
+              "host": ["{{xtime_base_url}}"],
+              "path": ["xws", "rest", "vehicles", "dealer", "{{dealer_id}}", "customerVehicles"],
+              "query": [
+                { "key": "tokenId",            "value": "{{xtime_token_id}}" },
+                { "key": "dlrCountryCode",     "value": "{{xtime_country_code}}" },
+                { "key": "gRecaptchaResponse", "value": "{{xtime_recaptcha}}" },
+                { "key": "email",              "value": "{{customer_email}}" }
+              ]
+            },
+            "description": "Returns `{ customers: [], vehicles: [] }`. Empty arrays → new-customer fork. Captures the XID cookie from Set-Cookie for later steps."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture the XID cookie that Xtime sets on the response.",
+                  "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "const m = /XID=([^;]+)/i.exec(setCookie);",
+                  "if (m) pm.collectionVariables.set('xtime_xid_cookie', m[1]);",
+                  "",
+                  "const json = pm.response.json();",
+                  "const v = (json.vehicles || [])[0];",
+                  "const c = (json.customers || [])[0];",
+                  "if (v) pm.collectionVariables.set('vehicle_id', v.vehicleId);",
+                  "if (c) pm.collectionVariables.set('customer_id', c.customerId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A'. Lookup by phone (alternative)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Origin", "value": "{{xtime_consumer_origin}}" },
+              { "key": "Referer", "value": "{{xtime_consumer_origin}}/" }
+            ],
+            "url": {
+              "raw": "{{xtime_base_url}}/xws/rest/vehicles/dealer/{{dealer_id}}/customerVehicles?tokenId={{xtime_token_id}}&dlrCountryCode={{xtime_country_code}}&gRecaptchaResponse={{xtime_recaptcha}}&phone={{customer_phone}}",
+              "host": ["{{xtime_base_url}}"],
+              "path": ["xws", "rest", "vehicles", "dealer", "{{dealer_id}}", "customerVehicles"],
+              "query": [
+                { "key": "tokenId",            "value": "{{xtime_token_id}}" },
+                { "key": "dlrCountryCode",     "value": "{{xtime_country_code}}" },
+                { "key": "gRecaptchaResponse", "value": "{{xtime_recaptcha}}" },
+                { "key": "phone",              "value": "{{customer_phone}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "C. Availability check",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Origin", "value": "{{xtime_consumer_origin}}" },
+              { "key": "Referer", "value": "{{xtime_consumer_origin}}/" },
+              { "key": "Cookie", "value": "XID={{xtime_xid_cookie}}" }
+            ],
+            "url": {
+              "raw": "{{xtime_base_url}}/xws/rest/appointment/dealer/{{dealer_id}}/availability?tokenId={{xtime_token_id}}&dlrCountryCode={{xtime_country_code}}&gRecaptchaResponse={{xtime_recaptcha}}",
+              "host": ["{{xtime_base_url}}"],
+              "path": ["xws", "rest", "appointment", "dealer", "{{dealer_id}}", "availability"],
+              "query": [
+                { "key": "tokenId",            "value": "{{xtime_token_id}}" },
+                { "key": "dlrCountryCode",     "value": "{{xtime_country_code}}" },
+                { "key": "gRecaptchaResponse", "value": "{{xtime_recaptcha}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dealerId\": \"{{dealer_id}}\",\n  \"customerId\": {{customer_id}},\n  \"vehicleId\": {{vehicle_id}},\n  \"serviceCodes\": [\"{{service_code}}\"],\n  \"startDate\": \"2026-05-29\",\n  \"endDate\":   \"2026-05-29\",\n  \"transportationCode\": \"CUSTWAIT\"\n}"
+            }
+          }
+        },
+        {
+          "name": "D. Book appointment (the god request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Origin", "value": "{{xtime_consumer_origin}}" },
+              { "key": "Referer", "value": "{{xtime_consumer_origin}}/" },
+              { "key": "Cookie", "value": "XID={{xtime_xid_cookie}}" }
+            ],
+            "url": {
+              "raw": "{{xtime_base_url}}/xws/rest/appointment/dealer/{{dealer_id}}/appointment?tokenId={{xtime_token_id}}&dlrCountryCode={{xtime_country_code}}&gRecaptchaResponse={{xtime_recaptcha}}",
+              "host": ["{{xtime_base_url}}"],
+              "path": ["xws", "rest", "appointment", "dealer", "{{dealer_id}}", "appointment"],
+              "query": [
+                { "key": "tokenId",            "value": "{{xtime_token_id}}" },
+                { "key": "dlrCountryCode",     "value": "{{xtime_country_code}}" },
+                { "key": "gRecaptchaResponse", "value": "{{xtime_recaptcha}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dealerId\": \"{{dealer_id}}\",\n  \"customer\": {\n    \"customerId\": {{customer_id}},\n    \"firstName\": \"Test\",\n    \"lastName\":  \"Customer\",\n    \"email\":     \"{{customer_email}}\",\n    \"phone\":     \"{{customer_phone}}\"\n  },\n  \"vehicle\": {\n    \"vehicleId\": {{vehicle_id}},\n    \"year\":  2022,\n    \"make\":  \"Subaru\",\n    \"model\": \"Outback\"\n  },\n  \"appointment\": {\n    \"startTime\": \"{{appointment_iso}}\",\n    \"transportationCode\": \"CUSTWAIT\",\n    \"services\": [\n      { \"serviceCode\": \"{{service_code}}\", \"description\": \"Lube, Oil & Filter\" }\n    ],\n    \"comments\": \"Booked via Postman during reverse-engineering.\"\n  }\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AutoAce Middleware",
+      "item": [
+        {
+          "name": "POST /api/schedule-xtime  (existing customer)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{middleware_base}}/api/schedule-xtime",
+              "host": ["{{middleware_base}}"],
+              "path": ["api", "schedule-xtime"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"schedule_xtime_appointment\",\n  \"call\": { \"call_id\": \"call_demo_123\" },\n  \"args\": {\n    \"customer_phone\": \"{{customer_phone}}\",\n    \"customer_email\": \"{{customer_email}}\",\n    \"customer_first_name\": \"Test\",\n    \"customer_last_name\":  \"Customer\",\n    \"vehicle_year\":  2022,\n    \"vehicle_make\":  \"Subaru\",\n    \"vehicle_model\": \"Outback\",\n    \"service_requested\": \"oil change\",\n    \"appointment_time\":  \"{{appointment_iso}}\",\n    \"transportation\":    \"CUSTWAIT\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "POST /api/schedule-xtime  (new customer)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{middleware_base}}/api/schedule-xtime",
+              "host": ["{{middleware_base}}"],
+              "path": ["api", "schedule-xtime"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"args\": {\n    \"customer_phone\": \"+15555550199\",\n    \"customer_email\": \"brand.new@example.com\",\n    \"customer_first_name\": \"Brand\",\n    \"customer_last_name\":  \"New\",\n    \"vehicle_year\":  2024,\n    \"vehicle_make\":  \"Subaru\",\n    \"vehicle_model\": \"Crosstrek\",\n    \"service_requested\": \"tire rotation\",\n    \"appointment_time\":  \"{{appointment_iso}}\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /api/health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{middleware_base}}/api/health",
+              "host": ["{{middleware_base}}"],
+              "path": ["api", "health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
