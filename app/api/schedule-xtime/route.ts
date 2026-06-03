@@ -57,6 +57,40 @@ export const dynamic = 'force-dynamic';
 
 type DealerRow = Database['public']['Tables']['dealers']['Row'];
 
+interface DebugTrace {
+  lookup?: {
+    customers_returned: number;
+    vehicles_returned: number;
+    matched_existing_customer: boolean;
+  };
+  vehicle?: {
+    metaVehicleId: string;
+    trim: string;
+    engineType: string;
+    engineSize: string;
+    driveType: string;
+    transmission: string;
+  };
+  service?: {
+    serviceId: number;
+    serviceName: string;
+    price?: number;
+    shopDuration?: number;
+    dmsOpcode?: string;
+  };
+  availability?: {
+    requested_day: string;
+    days_returned: number;
+    slot_count_for_day: number;
+    slots_for_day: string[];
+    confirmed_slot?: string;
+  };
+  booking?: {
+    attempted: boolean;
+    xtimeResponse?: unknown;
+  };
+}
+
 interface OrchestrationContext {
   retell: RetellArgs;
   callId?: string;
@@ -65,6 +99,7 @@ interface OrchestrationContext {
   service: { code: string; description: string };
   appointmentIso: string;
   supabase: SupabaseClient<Database>;
+  debug: DebugTrace;
 }
 
 interface SuccessResponse {
@@ -78,6 +113,7 @@ interface SuccessResponse {
     service_description: string;
     is_new_customer: boolean;
   };
+  debug?: DebugTrace;
 }
 
 interface FailureResponse {
@@ -93,6 +129,7 @@ interface FailureResponse {
     | 'XTIME_BOOKING_FAILED'
     | 'INTERNAL_ERROR';
   details?: unknown;
+  debug?: DebugTrace;
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
@@ -155,6 +192,7 @@ export async function POST(req: Request): Promise<NextResponse<SuccessResponse |
     service: resolveServiceCode(retell.service_requested),
     appointmentIso: coerceIsoDateTime(retell.appointment_time, dealer.timezone),
     supabase,
+    debug: {},
   };
 
   // Persist a `pending` row up-front so we have a paper trail even on failure.
@@ -169,13 +207,33 @@ export async function POST(req: Request): Promise<NextResponse<SuccessResponse |
 
     // ── Step B: fork ───────────────────────────────────────────────────────
     const { customer, vehicle, isNewCustomer } = forkCustomer(ctx, lookup);
+    ctx.debug.lookup = {
+      customers_returned: (Array.isArray(lookup) ? lookup.length : lookup?.customers?.length) ?? 0,
+      vehicles_returned: lookup?.vehicles?.length ?? 0,
+      matched_existing_customer: !isNewCustomer,
+    };
 
     // ── Step C: resolve metaVehicleId + engine details via trim lookup ─────
     const meta = await resolveMetaVehicle(ctx, vehicle);
+    ctx.debug.vehicle = {
+      metaVehicleId: meta.metaVehicleId,
+      trim: meta.trim,
+      engineType: meta.engineType,
+      engineSize: meta.engineSize,
+      driveType: meta.driveType,
+      transmission: meta.transmission,
+    };
 
     // ── Step D: fetch service catalog + pick matching service ─────────────
     const serviceInfo = await resolveServicePoint(ctx, vehicle, meta);
     const friendlyService = humanizeServiceName(serviceInfo.serviceName);
+    ctx.debug.service = {
+      serviceId: serviceInfo.serviceId,
+      serviceName: serviceInfo.serviceName,
+      price: serviceInfo.serviceObject?.price,
+      shopDuration: serviceInfo.serviceObject?.shopDuration,
+      dmsOpcode: serviceInfo.serviceObject?.dmsOpcode,
+    };
 
     // ── Step E: check slot availability ───────────────────────────────────
     await ensureSlotAvailable(ctx, vehicle, meta, serviceInfo);
@@ -200,6 +258,7 @@ export async function POST(req: Request): Promise<NextResponse<SuccessResponse |
           service_description: friendlyService,
           is_new_customer: isNewCustomer,
         },
+        debug: retell.debug ? ctx.debug : undefined,
       });
     }
 
@@ -232,6 +291,7 @@ export async function POST(req: Request): Promise<NextResponse<SuccessResponse |
         service_description: friendlyService,
         is_new_customer: isNewCustomer,
       },
+      debug: retell.debug ? ctx.debug : undefined,
     });
   } catch (err) {
     await ctx.supabase
@@ -832,6 +892,14 @@ async function ensureSlotAvailable(
 
   // Find the requested day
   const matchedDay = days.find((d) => d.calendarDate === day);
+
+  ctx.debug.availability = {
+    requested_day: day,
+    days_returned: days.length,
+    slot_count_for_day: matchedDay?.timeslots?.length ?? 0,
+    slots_for_day: (matchedDay?.timeslots ?? []).map((s) => s.time),
+  };
+
   if (!matchedDay?.timeslots?.length) {
     const speakable = speakableDate(ctx.appointmentIso, tz);
     throw new TaggedError(
@@ -860,6 +928,7 @@ async function ensureSlotAvailable(
   // Reconstruct ISO from the confirmed slot in the dealer's timezone.
   // We snap minutes/hours but keep the same yyyy-MM-dd.
   ctx.appointmentIso = isoInTimezone(day, hit.time, tz);
+  if (ctx.debug.availability) ctx.debug.availability.confirmed_slot = hit.time;
 }
 
 /** Step G: the booking POST to /dealer/{id}/appointment/confirm. */
@@ -1013,6 +1082,8 @@ async function placeBooking(
       full_response: resp,
     });
 
+    ctx.debug.booking = { attempted: true, xtimeResponse: resp };
+
     if (!ok) {
       throw new TaggedError(
         'XTIME_BOOKING_FAILED',
@@ -1106,6 +1177,8 @@ function mapErrorToResponse(
 ): NextResponse<FailureResponse> {
   console.error('[schedule-xtime] failure', err);
 
+  const dbg = ctx.retell.debug ? ctx.debug : undefined;
+
   if (err instanceof TaggedError) {
     switch (err.code) {
       case 'NO_AVAILABILITY':
@@ -1115,13 +1188,15 @@ function mapErrorToResponse(
           'vehicle_resolution',
           'service_catalog_match',
           'availability_check',
-        ]);
+        ], dbg);
       case 'XTIME_LOOKUP_FAILED':
         return jsonFail(
           'XTIME_LOOKUP_FAILED',
           "I'm having trouble pulling up your account right now — could we try again in a moment?",
           502,
           err.cause,
+          undefined,
+          dbg,
         );
       case 'XTIME_AVAILABILITY_FAILED':
         return jsonFail(
@@ -1129,6 +1204,8 @@ function mapErrorToResponse(
           "I'm having trouble checking the schedule. Let me transfer you to an advisor.",
           502,
           err.cause,
+          undefined,
+          dbg,
         );
       case 'XTIME_BOOKING_FAILED':
         return jsonFail(
@@ -1144,6 +1221,7 @@ function mapErrorToResponse(
             'availability_check',
             'booking_payload_built',
           ],
+          dbg,
         );
     }
   }
@@ -1153,10 +1231,9 @@ function mapErrorToResponse(
     "Something went wrong on our end. Let me transfer you to an advisor.",
     500,
     errMsg(err),
+    undefined,
+    dbg,
   );
-
-  // unused param kept for future per-dealer messaging
-  void ctx;
 }
 
 function jsonFail(
@@ -1165,9 +1242,10 @@ function jsonFail(
   status: number,
   details?: unknown,
   stepsCompleted?: string[],
+  debug?: DebugTrace,
 ): NextResponse<FailureResponse> {
   return NextResponse.json<FailureResponse>(
-    { success: false, message, error_code: code, details, steps_completed: stepsCompleted },
+    { success: false, message, error_code: code, details, steps_completed: stepsCompleted, debug },
     { status },
   );
 }

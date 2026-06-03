@@ -32,6 +32,13 @@ export const RetellArgsSchema = z.object({
    * actually booking.
    */
   dry_run: z.coerce.boolean().optional(),
+  /**
+   * When true, the API returns a `debug` object with the intermediate Xtime
+   * data captured at each step (customer/vehicle lookup, trim resolution,
+   * matched service, available slots + counts, and the raw Xtime booking
+   * response). Used by the demo console to visualize the full pipeline.
+   */
+  debug: z.coerce.boolean().optional(),
 });
 
 export type RetellArgs = z.infer<typeof RetellArgsSchema>;

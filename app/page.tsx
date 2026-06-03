@@ -55,12 +55,12 @@ export default function HomePage() {
             Reverse-engineered Xtime REST API bridge for programmatic service appointment scheduling at McGovern Subaru of Acton.
           </p>
           <div style={{ marginTop: 32, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href="/console" style={{ background: '#3b82f6', color: '#fff', padding: '10px 24px', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
+              ▶ Live Demo Console
+            </a>
             <a href="/api/health" style={{ background: '#1f2937', color: '#e5e7eb', padding: '10px 20px', borderRadius: 8, textDecoration: 'none', fontSize: 14, border: '1px solid #374151' }}>
               GET /api/health
             </a>
-            <span style={{ background: '#1e3a5f', color: '#93c5fd', padding: '10px 20px', borderRadius: 8, fontSize: 14, border: '1px solid #1e40af' }}>
-              POST /api/schedule-xtime
-            </span>
           </div>
         </div>
       </div>
