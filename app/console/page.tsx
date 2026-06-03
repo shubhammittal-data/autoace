@@ -112,6 +112,25 @@ export default function ConsolePage() {
 
   const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
+  function clear() {
+    setForm({
+      customer_first_name: '',
+      customer_last_name: '',
+      customer_phone: '',
+      customer_email: '',
+      vehicle_year: '',
+      vehicle_make: '',
+      vehicle_model: '',
+      service_requested: '',
+      appointment_time: '',
+      transportation: 'DROPOFF',
+      dry_run: false,
+    });
+    setRes(null);
+    setErr(null);
+    setElapsed(null);
+  }
+
   async function run() {
     setLoading(true);
     setRes(null);
@@ -121,12 +140,26 @@ export default function ConsolePage() {
     try {
       const body: Record<string, unknown> = {
         ...form,
-        vehicle_year: Number(form.vehicle_year),
-        // ISO-8601 with local offset
         appointment_time: new Date(form.appointment_time).toISOString(),
         debug: true,
       };
-      if (!form.customer_email) delete body.customer_email;
+      // Strip empty optional fields so blank values don't trip schema validation
+      // (e.g. an empty phone string fails the min-length rule).
+      const optional = [
+        'customer_first_name',
+        'customer_last_name',
+        'customer_phone',
+        'customer_email',
+        'vehicle_make',
+        'vehicle_model',
+      ] as const;
+      for (const k of optional) {
+        if (!form[k]) delete body[k];
+      }
+      // vehicle_year: send a number when provided, otherwise omit entirely.
+      if (form.vehicle_year) body.vehicle_year = Number(form.vehicle_year);
+      else delete body.vehicle_year;
+
       const r = await fetch('/api/schedule-xtime', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,7 +216,10 @@ export default function ConsolePage() {
       <div style={{ maxWidth: 980, margin: '0 auto', padding: '32px 24px', display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, alignItems: 'start' }}>
         {/* Form */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.1em', color: C.dim, marginBottom: 20 }}>BOOKING REQUEST</h2>
+          <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.1em', color: C.dim, marginBottom: 6 }}>BOOKING REQUEST</h2>
+          <p style={{ fontSize: 12, color: C.dim, margin: '0 0 18px' }}>
+            <span style={{ color: '#f87171' }}>*</span> required
+          </p>
           <div style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
@@ -218,11 +254,11 @@ export default function ConsolePage() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Service requested</label>
+              <label style={labelStyle}>Service requested <span style={{ color: '#f87171' }}>*</span></label>
               <input style={inputStyle} value={form.service_requested} onChange={(e) => set('service_requested', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Appointment time</label>
+              <label style={labelStyle}>Appointment time <span style={{ color: '#f87171' }}>*</span></label>
               <input type="datetime-local" style={inputStyle} value={form.appointment_time} onChange={(e) => set('appointment_time', e.target.value)} />
             </div>
             <div>
@@ -238,23 +274,41 @@ export default function ConsolePage() {
               <input type="checkbox" checked={form.dry_run} onChange={(e) => set('dry_run', e.target.checked)} />
               Dry run (stop before final booking)
             </label>
-            <button
-              onClick={run}
-              disabled={loading}
-              style={{
-                marginTop: 4,
-                background: loading ? C.border : C.blue,
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 16px',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: loading ? 'default' : 'pointer',
-              }}
-            >
-              {loading ? 'Running pipeline…' : 'Run Pipeline'}
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button
+                onClick={run}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  background: loading ? C.border : C.blue,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '12px 16px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: loading ? 'default' : 'pointer',
+                }}
+              >
+                {loading ? 'Running pipeline…' : 'Run Pipeline'}
+              </button>
+              <button
+                onClick={clear}
+                disabled={loading}
+                style={{
+                  background: 'transparent',
+                  color: C.muted,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: '12px 16px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: loading ? 'default' : 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
 
