@@ -174,6 +174,9 @@ export default function ConsolePage() {
             </a>
           </p>
         </div>
+        <div style={{ background: '#0f1b2d', border: '1px solid #1e40af', borderRadius: 10, padding: '14px 18px', marginTop: 12, fontSize: 13, color: '#93c5fd', lineHeight: 1.6 }}>
+          <strong style={{ color: '#bfdbfe' }}>Note:</strong> the voice widget above is Retell&apos;s hosted player — it speaks the result but does <strong>not</strong> display the underlying JSON. To inspect the full step-by-step pipeline data (customer lookup, vehicle/trim, matched service, available slots, and the raw Xtime booking response), use the <strong>Run Pipeline</strong> form below.
+        </div>
       </div>
 
       {/* Form + results grid */}
