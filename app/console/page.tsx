@@ -112,6 +112,16 @@ export default function ConsolePage() {
 
   const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
+  // Client-side required-field check. Phone OR email satisfies the contact rule.
+  const missing: string[] = [];
+  if (!form.service_requested) missing.push('Service');
+  if (!form.appointment_time) missing.push('Appointment time');
+  if (!form.vehicle_year) missing.push('Year');
+  if (!form.vehicle_make) missing.push('Make');
+  if (!form.vehicle_model) missing.push('Model');
+  if (!form.customer_phone && !form.customer_email) missing.push('Phone or email');
+  const isValid = missing.length === 0;
+
   function clear() {
     setForm({
       customer_first_name: '',
@@ -232,24 +242,24 @@ export default function ConsolePage() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Phone (E.164)</label>
+              <label style={labelStyle}>Phone (E.164) <span style={{ color: '#f87171' }}>*</span></label>
               <input style={inputStyle} value={form.customer_phone} onChange={(e) => set('customer_phone', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Email (optional)</label>
+              <label style={labelStyle}>Email (or phone above)</label>
               <input style={inputStyle} value={form.customer_email} onChange={(e) => set('customer_email', e.target.value)} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 12 }}>
               <div>
-                <label style={labelStyle}>Year</label>
+                <label style={labelStyle}>Year <span style={{ color: '#f87171' }}>*</span></label>
                 <input style={inputStyle} value={form.vehicle_year} onChange={(e) => set('vehicle_year', e.target.value)} />
               </div>
               <div>
-                <label style={labelStyle}>Make</label>
+                <label style={labelStyle}>Make <span style={{ color: '#f87171' }}>*</span></label>
                 <input style={inputStyle} value={form.vehicle_make} onChange={(e) => set('vehicle_make', e.target.value)} />
               </div>
               <div>
-                <label style={labelStyle}>Model</label>
+                <label style={labelStyle}>Model <span style={{ color: '#f87171' }}>*</span></label>
                 <input style={inputStyle} value={form.vehicle_model} onChange={(e) => set('vehicle_model', e.target.value)} />
               </div>
             </div>
@@ -277,17 +287,18 @@ export default function ConsolePage() {
             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
               <button
                 onClick={run}
-                disabled={loading}
+                disabled={loading || !isValid}
+                title={isValid ? '' : `Fill required fields: ${missing.join(', ')}`}
                 style={{
                   flex: 1,
-                  background: loading ? C.border : C.blue,
-                  color: '#fff',
+                  background: loading || !isValid ? C.border : C.blue,
+                  color: loading || !isValid ? C.dim : '#fff',
                   border: 'none',
                   borderRadius: 8,
                   padding: '12px 16px',
                   fontSize: 14,
                   fontWeight: 600,
-                  cursor: loading ? 'default' : 'pointer',
+                  cursor: loading || !isValid ? 'not-allowed' : 'pointer',
                 }}
               >
                 {loading ? 'Running pipeline…' : 'Run Pipeline'}
@@ -309,6 +320,11 @@ export default function ConsolePage() {
                 Clear
               </button>
             </div>
+            {!isValid && (
+              <p style={{ fontSize: 12, color: '#f87171', margin: '2px 0 0' }}>
+                Required: {missing.join(', ')}
+              </p>
+            )}
           </div>
         </div>
 
