@@ -167,9 +167,11 @@ function capsolverProvider(cfg: RecaptchaConfig): RecaptchaProvider {
       throw new Error('CapSolver timed out after 60s');
     },
     async mintTokens(count, action) {
-      const tokens: string[] = [];
-      for (let i = 0; i < count; i++) tokens.push(await this.getToken(action));
-      return tokens;
+      // Mint in parallel — CapSolver tasks run independently, so this turns
+      // 3 × ~10s sequential into ~10s total.
+      return Promise.all(
+        Array.from({ length: count }, () => this.getToken(action)),
+      );
     },
   };
 }

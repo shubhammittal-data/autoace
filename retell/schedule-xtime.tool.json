@@ -7,7 +7,7 @@
   "execution_message_description": "Give me one moment while I get that appointment booked for you.",
   "url": "https://autoace-pink.vercel.app/api/schedule-xtime",
   "method": "POST",
-  "timeout_ms": 25000,
+  "timeout_ms": 50000,
   "headers": {
     "Content-Type": "application/json"
   },
