@@ -1015,7 +1015,7 @@ async function placeBooking(
     if (!ok) {
       throw new TaggedError(
         'XTIME_BOOKING_FAILED',
-        "I wasn't able to lock in that appointment. Let me transfer you to an advisor.",
+        "I was able to find your vehicle, match your service, and confirm there's an opening — but I wasn't able to lock in the appointment due to a security restriction on Xtime's end. Let me transfer you to a human advisor who can complete this for you.",
         { xtimeResponse: resp },
       );
     }
@@ -1126,7 +1126,7 @@ function mapErrorToResponse(
       case 'XTIME_BOOKING_FAILED':
         return jsonFail(
           'XTIME_BOOKING_FAILED',
-          "I couldn't lock in that appointment. Let me transfer you to an advisor.",
+          "I was able to find your vehicle, match your service, and confirm there's an opening — but I wasn't able to lock in the appointment due to a security restriction on Xtime's end. Let me transfer you to a human advisor who can complete this for you.",
           502,
           err.cause,
         );
