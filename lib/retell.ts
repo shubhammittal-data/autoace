@@ -10,10 +10,10 @@
 import { z } from 'zod';
 
 export const RetellArgsSchema = z.object({
-  customer_phone: z.string().trim().min(7).optional(),
-  customer_email: z.string().trim().email().optional(),
-  customer_first_name: z.string().trim().optional(),
-  customer_last_name: z.string().trim().optional(),
+  customer_phone: z.string().trim().min(7).nullish().transform(v => v ?? undefined),
+  customer_email: z.string().trim().email().nullish().transform(v => v ?? undefined),
+  customer_first_name: z.string().trim().nullish().transform(v => v ?? undefined),
+  customer_last_name: z.string().trim().nullish().transform(v => v ?? undefined),
   vehicle_year: z.coerce.number().int().min(1980).max(2100).optional(),
   vehicle_make: z.string().trim().optional(),
   vehicle_model: z.string().trim().optional(),
