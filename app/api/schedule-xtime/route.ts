@@ -83,6 +83,7 @@ interface SuccessResponse {
 interface FailureResponse {
   success: false;
   message: string;
+  steps_completed?: string[];
   error_code:
     | 'BAD_REQUEST'
     | 'DEALER_NOT_FOUND'
@@ -1108,7 +1109,13 @@ function mapErrorToResponse(
   if (err instanceof TaggedError) {
     switch (err.code) {
       case 'NO_AVAILABILITY':
-        return jsonFail('NO_AVAILABILITY', err.message, 200);
+        return jsonFail('NO_AVAILABILITY', err.message, 200, undefined, [
+          'session_warm',
+          'customer_lookup',
+          'vehicle_resolution',
+          'service_catalog_match',
+          'availability_check',
+        ]);
       case 'XTIME_LOOKUP_FAILED':
         return jsonFail(
           'XTIME_LOOKUP_FAILED',
@@ -1129,6 +1136,14 @@ function mapErrorToResponse(
           "I was able to find your vehicle, match your service, and confirm there's an opening — but I wasn't able to lock in the appointment due to a security restriction on Xtime's end. Let me transfer you to a human advisor who can complete this for you.",
           502,
           err.cause,
+          [
+            'session_warm',
+            'customer_lookup',
+            'vehicle_resolution',
+            'service_catalog_match',
+            'availability_check',
+            'booking_payload_built',
+          ],
         );
     }
   }
@@ -1149,9 +1164,10 @@ function jsonFail(
   message: string,
   status: number,
   details?: unknown,
+  stepsCompleted?: string[],
 ): NextResponse<FailureResponse> {
   return NextResponse.json<FailureResponse>(
-    { success: false, message, error_code: code, details },
+    { success: false, message, error_code: code, details, steps_completed: stepsCompleted },
     { status },
   );
 }
